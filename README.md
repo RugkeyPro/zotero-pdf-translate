@@ -2,7 +2,7 @@
 
 基于 [windingwind/zotero-pdf-translate](https://github.com/windingwind/zotero-pdf-translate) **v2.4.8**，保留原作者署名与 **AGPL-3.0-or-later** 许可证。
 
-## 独立文献对话面板（v2.4.8-local.4）
+## 独立文献对话面板（v2.4.8-local.5）
 
 点击右侧 ✦「文献助手」图标，打开占满右侧空间的独立对话面板，不再嵌入条目详情。点击其他条目/笔记图标或 × 可返回原界面。面板采用 Gemini 风格的星形标记、轻渐变、圆角输入框与建议问题；回答安全渲染粗体、列表、表格和代码块，模型默认用自然段解释。
 
