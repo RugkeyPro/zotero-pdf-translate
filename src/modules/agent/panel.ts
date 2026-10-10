@@ -17,10 +17,11 @@ import {
   selections,
   changed,
 } from "./chat";
+import { renderMarkdown } from "./markdown";
 import { configureProvider, getProvider, listModels } from "./provider";
 const CSS = `
-.agent-pane{width:100%;min-width:0;font:13px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--color-paned-text,#252a31);background:var(--material-background,#f8fafc);border-radius:16px;display:flex;flex-direction:column;min-height:470px;height:var(--agent-height,650px);max-height:850px;box-sizing:border-box;overflow:hidden;border:1px solid var(--color-border,#e3e8ef)}
-.agent-pane *{box-sizing:border-box}.agent-pane button,.agent-pane select,.agent-pane input,.agent-pane textarea{font:inherit;color:inherit}.agent-pane button{cursor:pointer;border:0;background:transparent;border-radius:16px;padding:7px 11px}.agent-pane button:hover{background:#dfe9fb;color:#243b63}.agent-pane button:disabled{opacity:.45;cursor:default}.agent-top{display:flex;gap:4px;padding:10px 9px;align-items:center}.agent-top select{min-width:0;width:0;flex:1;background:transparent;border:0;text-overflow:ellipsis}.agent-title{font-size:12px;padding:0 14px;color:var(--color-text-secondary,#5e6571);line-height:1.5;max-height:38px;overflow:hidden}.agent-thread{flex:1;overflow-y:auto;padding:14px;min-height:180px}.agent-welcome{padding:36px 5px}.agent-star{font-size:34px;background:linear-gradient(30deg,#4285f4,#8b72e5,#d96fb3,#e9b942);background-clip:text;color:transparent}.agent-welcome h2{font-size:24px;font-weight:500;line-height:1.35;margin:12px 0 25px}.agent-suggestions{display:flex;flex-direction:column;align-items:flex-start;gap:9px}.agent-suggestions button{background:var(--material-background,#fff);border:1px solid var(--color-border,#e0e5ed);box-shadow:0 2px 8px #00000006;text-align:left}.agent-message{margin:0 0 18px;line-height:1.65;overflow-wrap:anywhere}.agent-message.user{background:#e8edf8;color:#25334c;border-radius:16px;padding:10px 12px;margin-left:24px}.agent-message.assistant .agent-label{font-size:11px;color:var(--color-text-secondary,#697386);margin-bottom:6px}.agent-prose{white-space:pre-wrap}.agent-message details{font-size:11px;margin-top:8px}.agent-message details p{white-space:pre-wrap;border-left:2px solid #9baff1;padding-left:8px;max-height:240px;overflow:auto}.agent-message .agent-save{font-size:11px;padding-left:0}.agent-status{font-size:11px;color:var(--color-text-secondary,#61708a);padding:0 14px 6px;min-height:21px}.agent-compose{margin:0 10px 10px;padding:10px;border:1px solid var(--color-border,#dce3ed);background:var(--material-background,#fff);border-radius:20px;box-shadow:0 2px 10px #00000008}.agent-context{font-size:11px;margin-bottom:5px;display:flex;gap:6px;align-items:center}.agent-context select{max-width:110px;border:0;background:transparent}.agent-context span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;color:var(--color-text-secondary,#697386)}.agent-compose textarea{width:100%;min-height:55px;max-height:130px;resize:vertical;border:0;outline:none;background:transparent;line-height:1.5}.agent-actions{display:flex;align-items:center;justify-content:space-between;gap:4px}.agent-actions select{min-width:0;font-size:11px;border:0;background:transparent;max-width:75%;width:0;flex:1}.agent-send{background:#dce9ff!important;color:#294983!important}.agent-settings{padding:10px;border-bottom:1px solid var(--color-border,#e0e5ed)}.agent-settings input{width:100%;margin-bottom:7px;border:1px solid var(--color-border,#ddd);border-radius:8px;padding:6px;background:var(--material-background,#fff)}.agent-privacy{font-size:10px;line-height:1.5;color:var(--color-text-secondary,#7a818e);padding:0 14px 10px}.agent-selected{font-size:11px;max-height:60px;overflow:auto;white-space:pre-wrap;background:#edf3ff;color:#3b4b67;border-radius:8px;margin-bottom:6px;padding:6px}
+.agent-pane{width:100%;min-width:0;font:13px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--color-paned-text,#252a31);background:linear-gradient(155deg,var(--material-background,#fff) 55%,#eaf2ff);border-radius:16px;display:flex;flex-direction:column;min-height:470px;height:100%;max-height:none;box-sizing:border-box;overflow:hidden;border:1px solid var(--color-border,#e3e8ef)}
+.agent-pane *{box-sizing:border-box}.agent-pane button,.agent-pane select,.agent-pane input,.agent-pane textarea{font:inherit;color:inherit}.agent-pane button{cursor:pointer;border:0;background:transparent;border-radius:16px;padding:7px 11px}.agent-pane button:hover{background:#dfe9fb;color:#243b63}.agent-pane button:disabled{opacity:.45;cursor:default}.agent-top{display:flex;gap:4px;padding:10px 9px;align-items:center}.agent-top select{min-width:0;width:0;flex:1;background:transparent;border:0;text-overflow:ellipsis}.agent-title{font-size:12px;padding:0 14px;color:var(--color-text-secondary,#5e6571);line-height:1.5;max-height:38px;overflow:hidden}.agent-thread{flex:1;overflow-y:auto;padding:14px;min-height:180px}.agent-welcome{padding:36px 5px}.agent-star{font-size:34px;background:linear-gradient(30deg,#4285f4,#8b72e5,#d96fb3,#e9b942);background-clip:text;color:transparent}.agent-welcome h2{font-size:24px;font-weight:500;line-height:1.35;margin:12px 0 25px}.agent-suggestions{display:flex;flex-direction:column;align-items:flex-start;gap:9px}.agent-suggestions button{background:var(--material-background,#fff);border:1px solid var(--color-border,#e0e5ed);box-shadow:0 2px 8px #00000006;text-align:left}.agent-message{margin:0 0 18px;line-height:1.65;overflow-wrap:anywhere}.agent-message.user{background:#e8edf8;color:#25334c;border-radius:16px;padding:10px 12px;margin-left:24px}.agent-message.assistant .agent-label{font-size:11px;color:var(--color-text-secondary,#697386);margin-bottom:6px}.agent-prose{white-space:normal}.agent-prose p{margin:0 0 12px;line-height:1.75;white-space:pre-wrap}.agent-prose h3{font-size:15px;margin:18px 0 9px;font-weight:600}.agent-prose ul,.agent-prose ol{padding-left:22px;margin:8px 0 14px}.agent-prose li{margin:5px 0}.agent-prose code{font-size:12px;background:#7d87a414;padding:2px 4px;border-radius:4px}.agent-prose pre{overflow:auto;white-space:pre;padding:12px;background:#7d87a414;border-radius:10px}.agent-prose pre code{background:transparent;padding:0}.agent-prose blockquote{border-left:3px solid #bbc8ea;margin:10px 0;padding-left:12px;color:var(--color-text-secondary,#5c667a)}.agent-table{overflow:auto}.agent-prose table{border-collapse:collapse;font-size:12px}.agent-prose td,.agent-prose th{padding:7px 9px;border:1px solid var(--color-border,#ddd);text-align:left}.agent-heading{display:flex;align-items:center;gap:9px;padding:12px 16px;font-size:16px}.agent-heading .agent-star{font-size:25px}.agent-heading button{margin-left:auto;font-size:22px}.agent-selected{display:flex;align-items:flex-start;gap:6px}.agent-selected[hidden]{display:none}.agent-selected div{flex:1;min-width:0;max-height:90px;overflow:auto}.agent-selected button{padding:0 5px}.agent-title{font-size:11px!important;opacity:.8}.agent-top{padding-top:0}.agent-message details{font-size:11px;margin-top:8px}.agent-message details p{white-space:pre-wrap;border-left:2px solid #9baff1;padding-left:8px;max-height:240px;overflow:auto}.agent-message .agent-save{font-size:11px;padding-left:0}.agent-status{font-size:11px;color:var(--color-text-secondary,#61708a);padding:0 14px 6px;min-height:21px}.agent-compose{margin:0 10px 10px;padding:10px;border:1px solid var(--color-border,#dce3ed);background:var(--material-background,#fff);border-radius:20px;box-shadow:0 2px 10px #00000008}.agent-context{font-size:11px;margin-bottom:5px;display:flex;gap:6px;align-items:center}.agent-context select{max-width:110px;border:0;background:transparent}.agent-context span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;color:var(--color-text-secondary,#697386)}.agent-compose textarea{width:100%;min-height:55px;max-height:130px;resize:vertical;border:0;outline:none;background:transparent;line-height:1.5}.agent-actions{display:flex;align-items:center;justify-content:space-between;gap:4px}.agent-actions select{min-width:0;font-size:11px;border:0;background:transparent;max-width:75%;width:0;flex:1}.agent-send{background:#dce9ff!important;color:#294983!important}.agent-settings{padding:10px;border-bottom:1px solid var(--color-border,#e0e5ed)}.agent-settings input{width:100%;margin-bottom:7px;border:1px solid var(--color-border,#ddd);border-radius:8px;padding:6px;background:var(--material-background,#fff)}.agent-privacy{font-size:10px;line-height:1.5;color:var(--color-text-secondary,#7a818e);padding:0 14px 10px}.agent-selected{font-size:11px;max-height:60px;overflow:auto;white-space:pre-wrap;background:#edf3ff;color:#3b4b67;border-radius:8px;margin-bottom:6px;padding:6px}
 @media(prefers-color-scheme:dark){.agent-message.user,.agent-selected{background:#29334a;color:#dce5f7}.agent-pane button:hover{background:#303f5b;color:#dce5f7}.agent-send{background:#334970!important;color:#e1eaff!important}}
 `;
 export class AgentPanel {
@@ -38,13 +39,13 @@ export class AgentPanel {
   private input: HTMLTextAreaElement;
   private threads: HTMLSelectElement;
   private model: HTMLSelectElement;
-  private scope: HTMLSelectElement;
-  private context: HTMLElement;
+  public onClose?: () => void;
+  private dismissedSelection = "";
   private selected: HTMLElement;
   private send: HTMLButtonElement;
   constructor(private body: HTMLElement) {
     this.doc = body.ownerDocument;
-    const markup = `<style xmlns="http://www.w3.org/1999/xhtml">${CSS}</style><div xmlns="http://www.w3.org/1999/xhtml" class="agent-pane"><div class="agent-top"><select aria-label="对话列表"></select><button type="button" data-action="new" title="新建对话">＋</button><button type="button" data-action="delete" title="删除当前对话">⌫</button><button type="button" data-action="settings" title="CPA 连接设置">⚙</button></div><div class="agent-title"></div><div class="agent-settings" hidden="hidden"><input aria-label="CPA 接口地址" placeholder="https://…/v1"/><input aria-label="CPA API 密钥" type="password" placeholder="密钥（留空保留现有）" autocomplete="off"/><button type="button" data-action="connect">保存连接并刷新模型</button></div><div class="agent-thread" role="log" aria-label="文献对话"></div><div class="agent-status" role="status"></div><div class="agent-compose"><div class="agent-context"><select aria-label="阅读范围"><option value="item">整个条目</option><option value="selection">选中文字</option></select><span></span><button type="button" data-action="selection" title="引用当前 PDF 选区">＋选区</button></div><div class="agent-selected" hidden="hidden"></div><textarea aria-label="提问" placeholder="问问这篇文献…"></textarea><div class="agent-actions"><select aria-label="对话模型"></select><button class="agent-send" type="button" data-action="send" title="发送或停止">↑</button></div></div><div class="agent-privacy">发送时将相关原文与对话交给 CPA；全文缓存和会话保存在本机。</div></div>`;
+    const markup = `<style xmlns="http://www.w3.org/1999/xhtml">${CSS}</style><div xmlns="http://www.w3.org/1999/xhtml" class="agent-pane"><div class="agent-heading"><span class="agent-star">✦</span><span>文献助手</span><button type="button" data-action="close" title="关闭助手">×</button></div><div class="agent-top"><select aria-label="对话列表"></select><button type="button" data-action="new" title="新建对话">＋</button><button type="button" data-action="delete" title="删除当前对话">⌫</button><button type="button" data-action="settings" title="CPA 连接设置">⚙</button></div><div class="agent-title"></div><div class="agent-settings" hidden="hidden"><input aria-label="CPA 接口地址" placeholder="https://…/v1"/><input aria-label="CPA API 密钥" type="password" placeholder="密钥（留空保留现有）" autocomplete="off"/><button type="button" data-action="connect">保存连接并刷新模型</button></div><div class="agent-thread" role="log" aria-label="文献对话"></div><div class="agent-status" role="status"></div><div class="agent-compose"><div class="agent-selected" hidden="hidden"></div><textarea aria-label="提问" placeholder="问问这篇文献…"></textarea><div class="agent-actions"><select aria-label="对话模型"></select><button class="agent-send" type="button" data-action="send" title="发送或停止">↑</button></div></div></div>`;
     const parsed = new (
       this.doc.defaultView as Window & typeof globalThis
     ).DOMParser().parseFromString(
@@ -62,8 +63,7 @@ export class AgentPanel {
     this.input = body.querySelector("textarea")!;
     this.threads = body.querySelector('[aria-label="对话列表"]')!;
     this.model = body.querySelector('[aria-label="对话模型"]')!;
-    this.scope = body.querySelector('[aria-label="阅读范围"]')!;
-    this.context = body.querySelector(".agent-context span")!;
+
     this.selected = body.querySelector(".agent-selected")!;
     this.send = body.querySelector('[data-action="send"]')!;
     body.addEventListener("click", this.click);
@@ -81,7 +81,7 @@ export class AgentPanel {
         void saveChats(this.item, this.state);
       }
     };
-    this.scope.onchange = () => this.refreshSelection();
+
     this.input.onkeydown = (e) => {
       if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
         e.preventDefault();
@@ -116,7 +116,7 @@ export class AgentPanel {
     this.item = root;
     this.state = undefined;
     this.input.value = "";
-    this.scope.value = "item";
+    this.dismissedSelection = "";
     const ticket = ++this.ticket;
     this.thread.textContent = "加载条目对话…";
     try {
@@ -140,14 +140,24 @@ export class AgentPanel {
     const selection = this.item
       ? selections.get(itemKey(this.item))
       : undefined;
-    const enabled = this.scope.value === "selection";
-    this.selected.hidden = !enabled;
-    this.selected.textContent = enabled
-      ? selection?.text || "先在 PDF 中划选文字，再点击“＋选区”"
-      : "";
-    this.context.textContent = enabled
-      ? "只读选区，不检索条目全文"
-      : "全部 PDF · 元数据 · 笔记 · 注释";
+    const text = selection?.text || "";
+    this.selected.hidden =
+      !text ||
+      `${text}:${selection?.revision || 0}` === this.dismissedSelection;
+    this.selected.replaceChildren();
+    if (!this.selected.hidden) {
+      const quote = this.el("div");
+      quote.textContent = text;
+      const remove = this.el("button");
+      remove.type = "button";
+      remove.textContent = "×";
+      remove.title = "移除本轮引用";
+      remove.onclick = () => {
+        this.dismissedSelection = `${text}:${selection?.revision || 0}`;
+        this.refreshSelection();
+      };
+      this.selected.append(quote, remove);
+    }
   }
   private render() {
     if (!this.item || !this.state || this.disposed) return;
@@ -178,11 +188,7 @@ export class AgentPanel {
     this.model.disabled = !!busy;
     this.send.textContent = busy ? "■" : "↑";
     this.send.setAttribute("aria-label", busy ? "停止生成" : "发送问题");
-    this.status.textContent =
-      busy ||
-      (c.summary
-        ? "早期对话已压缩 · 最近上下文保留"
-        : "条目独立对话 · 本地全文缓存");
+    this.status.textContent = busy || "";
     this.refreshSelection();
     const bottom =
       this.thread.scrollHeight -
@@ -226,7 +232,9 @@ export class AgentPanel {
       }
       const text = this.el("div");
       text.className = "agent-prose";
-      text.textContent = m.content || (busy ? "正在思考…" : "");
+      if (m.role === "assistant")
+        renderMarkdown(this.doc, text, m.content || (busy ? "正在思考…" : ""));
+      else text.textContent = m.content;
       card.append(text);
       if (m.selection) {
         const q = this.el("details");
@@ -285,17 +293,15 @@ export class AgentPanel {
     }
     const question = this.input.value.trim();
     if (!question) return;
-    const selection =
-      this.scope.value === "selection"
-        ? selections.get(itemKey(item))?.text
-        : "";
-    if (this.scope.value === "selection" && !selection) {
-      this.status.textContent = "请先在当前条目的 PDF 中划选原文";
-      return;
-    }
+    const selection = selections.get(itemKey(item))?.text || "";
+    const quoted =
+      `${selection}:${selections.get(itemKey(item))?.revision || 0}` ===
+      this.dismissedSelection
+        ? ""
+        : selection;
     this.input.value = "";
     try {
-      await sendChat(item, c, question, selection);
+      await sendChat(item, c, question, quoted);
     } catch {
       this.status.textContent = "会话保存失败，请检查数据目录权限";
     }
@@ -316,10 +322,8 @@ export class AgentPanel {
         await this.submit();
         return;
       }
-      if (action === "selection") {
-        this.scope.value = "selection";
-        this.refreshSelection();
-        this.input.focus();
+      if (action === "close") {
+        this.onClose?.();
         return;
       }
       if (action === "new") {

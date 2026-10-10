@@ -16,6 +16,8 @@ export function registerReaderInitializer() {
         selections.set(itemKey(item), {
           text: params.annotation.text.trim(),
           attachmentID: reader.itemID,
+          pageIndex: params.annotation.position?.pageIndex,
+          revision: Date.now(),
         });
         changed();
       }

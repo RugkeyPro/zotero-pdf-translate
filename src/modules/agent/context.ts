@@ -2,9 +2,12 @@ export interface SourceChunk {
   id: string;
   source: string;
   text: string;
+  attachmentKey?: string;
+  pageIndex?: number;
 }
 export interface Corpus {
   fingerprint: string;
+  schema?: number;
   title: string;
   chunks: SourceChunk[];
   overview: string;
@@ -87,9 +90,9 @@ export function searchChunks(chunks: SourceChunk[], query: string, limit = 6) {
 export function coverage(chunks: SourceChunk[], limit = 12) {
   const groups = new Map<string, SourceChunk[]>();
   for (const c of chunks) {
-    const list = groups.get(c.source) || [];
+    const list = groups.get(c.attachmentKey || c.source) || [];
     list.push(c);
-    groups.set(c.source, list);
+    groups.set(c.attachmentKey || c.source, list);
   }
   const picked: SourceChunk[] = [];
   for (const list of groups.values())
@@ -117,4 +120,21 @@ export function recentHistory(conversation: Conversation, budget = 16000) {
     if (result.length >= 10) break;
   }
   return result;
+}
+
+export function splitPDF(
+  source: string,
+  text: string,
+  key: string,
+  totalPages?: number,
+): SourceChunk[] {
+  const pages = text.split("\f");
+  while (totalPages && pages.length < totalPages) pages.push("");
+  return pages.flatMap((page, pageIndex) =>
+    splitSource(
+      `${source} · PDF 第${pageIndex + 1}页`,
+      page || "此页无可提取文字，可读取完整页面图像。",
+      `PDF${key}P${pageIndex + 1}`,
+    ).map((chunk) => ({ ...chunk, attachmentKey: key, pageIndex })),
+  );
 }

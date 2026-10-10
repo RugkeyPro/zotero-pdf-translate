@@ -6,6 +6,8 @@ import {
 } from "./modules/preferenceWindow";
 import {
   registerReaderTabPanel,
+  registerAgentWindow,
+  unregisterAgentWindow,
   updateReaderTabPanels,
 } from "./modules/tabpanel";
 import { buildReaderPopup, updateReaderPopup } from "./modules/popup";
@@ -96,6 +98,7 @@ async function onMainWindowLoad(win: Window): Promise<void> {
   );
 
   registerMenu();
+  registerAgentWindow(win);
 
   win.document.addEventListener("focusout", (ev) => {
     if (ev.target !== win.document) {
@@ -106,6 +109,7 @@ async function onMainWindowLoad(win: Window): Promise<void> {
 }
 
 async function onMainWindowUnload(win: Window): Promise<void> {
+  unregisterAgentWindow(win);
   win.document
     .querySelector(`[href="${config.addonRef}-mainWindow.ftl"]`)
     ?.remove();

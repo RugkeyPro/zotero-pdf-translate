@@ -2,6 +2,7 @@ import {
   Corpus,
   ItemChats,
   splitSource,
+  splitPDF,
   coverage,
   formatSources,
   Conversation,
@@ -151,6 +152,7 @@ async function buildCorpus(parent: Zotero.Item, key: string): Promise<Corpus> {
       /* First read. */
     }
   if (
+    cached?.schema === 2 &&
     cached?.fingerprint === fingerprint &&
     (!cached.warnings.length || Date.now() - (cached.cachedAt || 0) < 300000)
   ) {
@@ -160,26 +162,34 @@ async function buildCorpus(parent: Zotero.Item, key: string): Promise<Corpus> {
   const chunks = splitSource("标题、摘要与元数据", meta, "META");
   for (const pdf of pdfs) {
     if (
+      cached?.schema === 2 &&
       pdfStamps[pdf.key] &&
       cached?.pdfStamps?.[pdf.key] === pdfStamps[pdf.key]
     ) {
-      const previous = cached.chunks.filter((c) =>
-        c.id.startsWith(`PDF${pdf.key}-`),
-      );
+      const previous = cached.chunks.filter((c) => c.attachmentKey === pdf.key);
       if (previous.length) {
         chunks.push(...previous);
         continue;
       }
     }
     try {
-      const text = await pdf.attachmentText;
-      if (text?.trim())
+      const worker = Zotero.PDFWorker as any;
+      const extracted = worker?.getFullText
+        ? await worker.getFullText(pdf.id, null, false)
+        : { text: await pdf.attachmentText };
+      const text = extracted.text || "";
+      if (text.trim() || extracted.totalPages)
         chunks.push(
-          ...splitSource(String(pdf.getField("title")), text, `PDF${pdf.key}`),
+          ...splitPDF(
+            String(pdf.getField("title")),
+            text,
+            pdf.key,
+            extracted.totalPages,
+          ),
         );
-      else
+      if (!text.trim())
         warnings.push(
-          `${pdf.getField("title")}：没有可提取文字，扫描件需要 OCR`,
+          `${pdf.getField("title")}：没有可提取文字，可按页读取图像；大篇幅扫描件建议先 OCR`,
         );
     } catch {
       warnings.push(`${pdf.getField("title")}：全文提取失败`);
@@ -202,6 +212,7 @@ async function buildCorpus(parent: Zotero.Item, key: string): Promise<Corpus> {
       ),
     );
   const corpus: Corpus = {
+    schema: 2,
     fingerprint,
     title: String(parent.getField("title")),
     chunks,
