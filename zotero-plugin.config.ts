@@ -5,7 +5,7 @@ import { copyFileSync } from "fs";
 export default defineConfig({
   source: ["src", "addon"],
   dist: "build",
-  name: pkg.config.addonName,
+  name: "Translate for Zotero Local",
   id: pkg.config.addonID,
   namespace: pkg.config.addonRef,
   updateURL:
