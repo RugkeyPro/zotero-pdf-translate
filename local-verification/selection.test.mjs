@@ -12,6 +12,14 @@ const compiled = await build({
       name: "host",
       setup(b) {
         b.onResolve(
+          { filter: /modules\/pronunciation$|^\.\/pronunciation$/ },
+          (a) => ({ path: a.path, namespace: "speech" }),
+        );
+        b.onLoad({ filter: /.*/, namespace: "speech" }, () => ({
+          contents:
+            "export const playPronunciation = async text => globalThis.speechCalls.push(text);",
+        }));
+        b.onResolve(
           { filter: /utils\/(task|prefs|locale|config|str)$/ },
           (a) => ({ path: a.path, namespace: "host" }),
         );
@@ -36,7 +44,7 @@ writeFileSync(
 );
 const { buildReaderPopup, updateReaderPopup } =
   await import("./.qa-bundle.mjs");
-const playURLs = [];
+globalThis.speechCalls = [];
 function create(doc, s) {
   const e =
     s.tag === "fragment"
@@ -73,9 +81,7 @@ globalThis.ztoolkit = {
       constructor(url) {
         this.url = url;
       }
-      async play() {
-        playURLs.push(this.url);
-      }
+      async play() {}
       pause() {}
     },
   ProgressWindow: class {
@@ -170,14 +176,24 @@ f.task.raw = "other selection";
 f.button.click();
 assert.equal(f.saved[0].comment, "");
 f = await fixture();
-const audioButtons = [...f.doc.querySelectorAll("button")].filter((b) =>
-  /英音|美音/.test(b.textContent),
+const audioButtons = [...f.doc.querySelectorAll("button")].filter(
+  (b) => b.textContent === "🔊",
 );
-assert.equal(audioButtons.length, 2);
+assert.equal(audioButtons.length, 1);
 for (const b of audioButtons) b.click();
 await new Promise((r) => setTimeout(r, 5));
-assert.match(playURLs[0], /audio=Mercury&type=1/);
-assert.match(playURLs[1], /audio=Mercury&type=2/);
+assert.deepEqual(globalThis.speechCalls, ["Mercury"]);
 console.log(
-  "PASS: native highlight saves translation, edited result, waiting/processing (no duplicate), failed translation, cross-selection safety, and two audio buttons.",
+  "PASS: native highlight saves translation, edited result, waiting/processing (no duplicate), failed translation, cross-selection safety, and a single US speaker button.",
+);
+
+f = await fixture();
+f.task.raw = "Mercury is a potent neurotoxic substance.";
+f.doc.querySelector(".selection-popup").dataset.selectionText = f.task.raw;
+updateReaderPopup();
+f.doc.querySelector('[aria-label="朗读原文（美音）"]').click();
+await new Promise((r) => setTimeout(r, 5));
+assert.equal(globalThis.speechCalls.at(-1), f.task.raw);
+console.log(
+  "PASS: single speaker sends the full selected sentence to natural US speech.",
 );

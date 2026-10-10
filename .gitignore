@@ -11,3 +11,4 @@ zotero-cmd.json
 # Local installation backup and test bundles
 backup-original/
 local-verification/.qa-bundle.mjs
+local-verification/.speech-qa.mjs

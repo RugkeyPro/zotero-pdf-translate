@@ -5,7 +5,7 @@
 新增两项轻量功能：
 
 - **颜色按钮保存译文**：划词翻译后，点击颜色按钮，沿用 Zotero 原生高亮/下划线，并把当前译文（包括手动修订）保存到该注释的评论栏。翻译处理中会短暂等待；失败时保留高亮，不把错误信息当译文写入。
-- **英音 / 美音**：英文选区弹窗提供两个发音按钮，不依赖翻译服务是否返回音频。复用原插件已有的有道音频接口，点击时将选区原文发送给有道，需要联网。
+- **单个喇叭，美式自然朗读**：英文选区只显示一个 🔊 按钮，固定使用 Microsoft Edge 在线自然语音 `en-US-EmmaMultilingualNeural`，支持单词与整句，无需账户、个人密钥或额外运行时依赖。再次点击会停止上一段并重新朗读。需要联网，选区原文会发送给微软；单次最多 6000 字符，请求超时/失败会提示。
 
 译文保存为 Zotero PDF 注释的评论，**不是把文字直接印在 PDF 正文上**。将 PDF 连同注释导出时可携带评论。
 
@@ -13,9 +13,11 @@
 
 构建：`npm ci --ignore-scripts && npm run build`（Node.js 24）。
 
-本地行为测试：`npm ci --prefix local-verification --ignore-scripts && node local-verification/selection.test.mjs`。
+本地行为测试：`npm ci --prefix local-verification --ignore-scripts && node local-verification/selection.test.mjs && node local-verification/pronunciation.test.mjs`。
 
-已验证 TypeScript/构建、DOM 原生点击路径的译文保存/编辑/等待/失败/防串选区，以及英美两路音频 HTTP 200。已在 Zotero 本地加载；真实 PDF 划词后的声音与操作体验仍需用户验收。
+已验证 TypeScript/构建、DOM 点击路径的译文保存/编辑/等待/失败/防串选区及单喇叭整句朗读，以及语音协议、MP3 解析、取消和资源清理。在本机 Zotero 中实际调用生产播放函数，整句合成返回有效 MP3，`Audio.play()` 正常启动；音色偏好由用户验收。
+
+语音连接使用 Edge Read Aloud 在线接口，参考 [edge-tts](https://github.com/rany2/edge-tts) 的协议；无需安装 Edge 或 Python。该接口不是微软承诺稳定的公共开发者 API，服务或协议变动可能导致朗读暂时不可用。
 
 ---
 

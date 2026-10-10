@@ -6,7 +6,7 @@ import { addTranslateTask, getLastTranslateTask } from "../utils/task";
 import { slice } from "../utils/str";
 import { normalizeSelection, pronunciationAudio } from "./selectionActions";
 
-let playingAudio: HTMLAudioElement | undefined;
+import { playPronunciation } from "./pronunciation";
 
 export function updateReaderPopup() {
   const popup = addon.data.popup.currentPopup;
@@ -61,7 +61,7 @@ export function updateReaderPopup() {
   popup.setAttribute("translate-task-id", task.id);
 
   const audioList = pronunciationAudio(task.raw);
-  if (!audioList.length) audioList.push(...task.audio);
+  if (!audioList.length) audioList.push(...task.audio.slice(0, 1));
   audiobox.innerHTML = "";
   updateHidden(audiobox, !audioList.length || !getPref("showPlayBtn"));
   if (audioList.length > 0 && getPref("showPlayBtn")) {
@@ -76,20 +76,19 @@ export function updateReaderPopup() {
           attributes: {
             tabindex: "-1",
             title: audioData.text,
+            "aria-label": "朗读原文（美音）",
           },
           properties: {
-            textContent: `🔊 ${audioData.text}`,
+            textContent: "🔊",
             onclick: async (event: Event) => {
-              playingAudio?.pause();
-              playingAudio = new (ztoolkit.getGlobal("Audio"))(audioData.url);
+              const button = event.currentTarget as HTMLButtonElement;
               try {
-                await playingAudio.play();
+                await playPronunciation(task.raw);
               } catch {
-                (event.currentTarget as HTMLButtonElement).title =
-                  "发音播放失败，请检查网络后重试";
+                button.title = "发音播放失败，请检查网络与声音设置后重试";
                 new ztoolkit.ProgressWindow("发音")
                   .createLine({
-                    text: "播放失败，请检查网络后重试",
+                    text: "播放失败，请检查网络与声音设置后重试",
                     type: "default",
                   })
                   .show();
@@ -103,10 +102,8 @@ export function updateReaderPopup() {
     );
   }
 
-  if (task.audio.length > 0 && getPref("showPlayBtn") && getPref("autoPlay")) {
-    const firstAudio = task.audio[0];
-    const audio = new (ztoolkit.getGlobal("Audio"))(firstAudio.url);
-    audio.play();
+  if (audioList.length > 0 && getPref("showPlayBtn") && getPref("autoPlay")) {
+    void playPronunciation(task.raw).catch(() => {});
   }
 
   const hideTranslateButton = task.status !== "waiting";

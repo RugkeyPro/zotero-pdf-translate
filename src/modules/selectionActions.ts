@@ -9,17 +9,13 @@ export function normalizeSelection(text: string) {
 }
 
 export function pronunciationAudio(text: string) {
-  // Use the same small audio endpoint as the existing Youdao dictionary service.
+  // The popup speaks the original selection through the natural US TTS service.
   if (!/[a-z]/i.test(text) || /[^\x20-\x7E\u2010-\u2027]/u.test(text))
     return [];
   return [
     {
-      text: "英音",
-      url: `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(text)}&type=1`,
-    },
-    {
       text: "美音",
-      url: `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(text)}&type=2`,
+      url: "",
     },
   ];
 }
