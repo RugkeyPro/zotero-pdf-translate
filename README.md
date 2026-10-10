@@ -1,23 +1,43 @@
-# Zotero Translate — 轻量增强版
+# Zotero Translate — 文献助手轻量增强版
 
 基于 [windingwind/zotero-pdf-translate](https://github.com/windingwind/zotero-pdf-translate) **v2.4.8**，保留原作者署名与 **AGPL-3.0-or-later** 许可证。
 
-新增两项轻量功能：
+## 文献对话栏（v2.4.8-local.3）
 
-- **颜色按钮保存译文**：划词翻译后，点击颜色按钮，沿用 Zotero 原生高亮/下划线，并把当前译文（包括手动修订）保存到该注释的评论栏。翻译处理中会短暂等待；失败时保留高亮，不把错误信息当译文写入。
-- **单个喇叭，美式自然朗读**：英文选区只显示一个 🔊 按钮，固定使用 Microsoft Edge 在线自然语音 `en-US-EmmaMultilingualNeural`，支持单词与整句，无需账户、个人密钥或额外运行时依赖。再次点击会停止上一段并重新朗读。需要联网，选区原文会发送给微软；单次最多 6000 字符，请求超时/失败会提示。
+原翻译侧边栏替换为「文献助手」，采用圆角输入框、建议问题和简洁对话布局。进入 PDF 阅读器右侧，或条目详情中的「文献助手」即可使用。
 
-译文保存为 Zotero PDF 注释的评论，**不是把文字直接印在 PDF 正文上**。将 PDF 连同注释导出时可携带评论。
+- **整个条目**：读取当前父条目下全部 PDF、标题/摘要等元数据、已有笔记和 PDF 注释；各条目相互隔离。
+- **选中文字**：先在 PDF 中划选句段，点击「＋选区」。选区模式只检索这段文字，保留当前会话的历史；整条目模式结合条目上下文回答。
+- **多会话与流式回答**：每个条目可新建、切换、删除会话；Enter 发送，Shift+Enter 换行，生成时可停止。模型下拉菜单支持切换，默认 `gemini-3.8-flash-high`。
+- **来源与笔记**：回答提供来源片段编号，展开可查看原文；点击「保存为笔记」创建当前条目的子笔记，附问题、回答、模型、时间和来源。Agent 只拥有本条目的检索/读取工具，写入笔记需手动点击。
+- **CPA 接入**：优先使用侧栏 ⚙ 配置的接口，否则自动读取本机 `~/.pi/agent/models.json` 中的 `cpa-server`。支持兼容的 `/v1/models`、`/v1/chat/completions`、SSE 和工具调用。手动配置的密钥保存在 Zotero 登录管理器，配置界面不回显密钥；仓库与安装包不含个人密钥。
 
-从本仓库 [Releases](https://github.com/RugkeyPro/zotero-pdf-translate/releases) 下载 `.xpi`，在 Zotero「工具 → 插件 → 从文件安装插件」安装。插件 ID 保持不变，会替换原 Translate 插件并沿用原有设置。可安装上游 v2.4.8 恢复原版。
+### 缓存和上下文
+
+首次提问提取并切分 PDF。全文与会话保存在 Zotero 数据目录的 `translate-agent/`，按文库与条目键区分。通过文件大小、修改时间及条目/笔记/注释信息检查变化：修改笔记无需重读 PDF，只重建发生变化的 PDF。没有文本层的扫描 PDF 会提示需要 OCR，不内置 OCR 服务。
+
+每轮发送资料索引、覆盖各来源的概览摘录、相关段落和最近历史；模型可按需调用本地检索和片段读取工具，最多四轮生成，工具原文合计约 24,000 字符。概览为首/中/尾摘录，不等同于完整全文摘要，检索使用轻量关键词方式，未加入向量数据库。长对话自动压缩早期历史，完整对话仍在本机保存。源编号是缓存片段编号，不冒充 PDF 页码。
+
+仅提问时将所需原文和对话发给配置的 CPA；切换条目不会自动发送全文。删除对话会删除该条目的本地会话记录。
+
+## 保留的划词功能
+
+- **颜色按钮保存译文**：划词翻译后，点击颜色按钮，沿用 Zotero 原生高亮/下划线，并把当前译文（包括手动修订）保存到该注释的评论栏。翻译处理中短暂等待；失败时保留高亮。
+- **单个喇叭，美式自然朗读**：英文选区只显示一个 🔊，使用 Edge 在线自然语音 `en-US-EmmaMultilingualNeural`，支持单词与整句，无需个人密钥。需要联网，选区原文发送给微软；单次最多 6000 字符。参考 [edge-tts](https://github.com/rany2/edge-tts) 协议，该在线接口可能随服务变动失效。
+
+译文保存在 PDF 注释评论中，导出 PDF 连同注释可携带评论。
+
+## 安装与验证
+
+从 [Releases](https://github.com/RugkeyPro/zotero-pdf-translate/releases) 下载 `.xpi`，在 Zotero「工具 → 插件 → 从文件安装插件」安装。插件 ID 不变，替换原 Translate 并沿用设置。安装上游 v2.4.8 可恢复原版。
 
 构建：`npm ci --ignore-scripts && npm run build`（Node.js 24）。
 
-本地行为测试：`npm ci --prefix local-verification --ignore-scripts && node local-verification/selection.test.mjs && node local-verification/pronunciation.test.mjs`。
+回归测试：`npm ci --prefix local-verification --ignore-scripts`，随后分别运行 `node local-verification/selection.test.mjs`、`node local-verification/pronunciation.test.mjs`、`node local-verification/agent.test.mjs`。
 
-已验证 TypeScript/构建、DOM 点击路径的译文保存/编辑/等待/失败/防串选区及单喇叭整句朗读，以及语音协议、MP3 解析、取消和资源清理。在本机 Zotero 中实际调用生产播放函数，整句合成返回有效 MP3，`Audio.play()` 正常启动；音色偏好由用户验收。
+已验证 TypeScript、构建、划词保存和语音协议；Agent 测试覆盖多 PDF、增量缓存、条目隔离、多会话、SSE 分片、检索工具、选区模式、中断、历史压缩及笔记保存。在真实 Zotero 条目中成功读取 3 个 PDF、76 个片段，使用 CPA 完成两轮回答和创建子笔记。语音此前已验证实际合成 MP3 并启动播放。
 
-语音连接使用 Edge Read Aloud 在线接口，参考 [edge-tts](https://github.com/rany2/edge-tts) 的协议；无需安装 Edge 或 Python。该接口不是微软承诺稳定的公共开发者 API，服务或协议变动可能导致朗读暂时不可用。
+以下保留上游说明；其中旧翻译侧栏描述不适用于本增强版。
 
 ---
 

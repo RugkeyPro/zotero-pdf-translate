@@ -1,7 +1,7 @@
 itemPaneSection-header =
-    .label = 翻译
+    .label = 文献助手
 itemPaneSection-sidenav =
-    .tooltiptext = 翻译
+    .tooltiptext = 文献助手
 itemPaneSection-fullHeight =
     .tooltiptext = 自适应高度
 itemPaneSection-openStandalone =
@@ -11,6 +11,6 @@ field-titleTranslation = 标题翻译
 field-abstractTranslation = 摘要翻译
 
 itemmenu-translateTitle =
-    .label = 翻译标题
+    .label = 文献助手标题
 itemmenu-translateAbstract =
-    .label = 翻译摘要
+    .label = 文献助手摘要

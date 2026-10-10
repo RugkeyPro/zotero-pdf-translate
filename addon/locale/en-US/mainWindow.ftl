@@ -1,7 +1,7 @@
 itemPaneSection-header =
-    .label = Translate
+    .label = Literature Assistant
 itemPaneSection-sidenav =
-    .tooltiptext = Translate
+    .tooltiptext = Literature Assistant
 itemPaneSection-fullHeight =
     .tooltiptext = Full height
 itemPaneSection-openStandalone =
@@ -11,6 +11,6 @@ field-titleTranslation = Title Translation
 field-abstractTranslation = Abstract Translation
 
 itemmenu-translateTitle =
-    .label = Translate Title
+    .label = Literature Assistant Title
 itemmenu-translateAbstract =
-    .label = Translate Abstract
+    .label = Literature Assistant Abstract

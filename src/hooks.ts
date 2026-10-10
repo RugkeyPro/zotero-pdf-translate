@@ -26,6 +26,7 @@ import { registerExtraColumns } from "./modules/itemTree";
 import { registerShortcuts } from "./modules/shortcuts";
 import { registerItemPaneInfoRows } from "./modules/infoBox";
 import { registerCustomFields } from "./modules/fields";
+import { shutdownAgent } from "./modules/agent/chat";
 import { stopPronunciation } from "./modules/pronunciation";
 
 async function onStartup() {
@@ -111,6 +112,7 @@ async function onMainWindowUnload(win: Window): Promise<void> {
 }
 
 function onShutdown(): void {
+  shutdownAgent();
   stopPronunciation();
   ztoolkit.unregisterAll();
   Zotero.getMainWindows().forEach((win) => {

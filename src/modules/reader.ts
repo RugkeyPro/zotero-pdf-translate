@@ -1,3 +1,5 @@
+import { selections, changed } from "./agent/chat";
+import { rootItem, itemKey } from "./agent/storage";
 import { config } from "../../package.json";
 import { SVGIcon } from "../utils/config";
 import { addTranslateAnnotationTask } from "../utils/task";
@@ -9,6 +11,14 @@ export function registerReaderInitializer() {
     (event) => {
       const { reader, doc, params, append } = event;
       addon.data.translate.selectedText = params.annotation.text.trim();
+      if (reader.itemID) {
+        const item = rootItem(Zotero.Items.get(reader.itemID));
+        selections.set(itemKey(item), {
+          text: params.annotation.text.trim(),
+          attachmentID: reader.itemID,
+        });
+        changed();
+      }
       addon.hooks.onReaderPopupShow(event);
     },
     config.addonID,
