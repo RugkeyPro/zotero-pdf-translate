@@ -136,8 +136,8 @@ function onNotify(
       extraData?.skipAutoSync
     )
       return;
-    const annotationItems = Zotero.Items.get(ids as number[]).filter((item) =>
-      item.isAnnotation(),
+    const annotationItems = Zotero.Items.get(ids as number[]).filter(
+      (item) => item.isAnnotation() && !item.annotationComment?.trim(),
     );
     if (annotationItems.length === 0) {
       return;

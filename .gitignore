@@ -8,3 +8,6 @@ zotero-cmd.json
 .DS_Store
 .env
 .scaffold
+# Local installation backup and test bundles
+backup-original/
+local-verification/.qa-bundle.mjs

@@ -4,6 +4,9 @@ import { getString } from "../utils/locale";
 import { getPref, setPref } from "../utils/prefs";
 import { addTranslateTask, getLastTranslateTask } from "../utils/task";
 import { slice } from "../utils/str";
+import { normalizeSelection, pronunciationAudio } from "./selectionActions";
+
+let playingAudio: HTMLAudioElement | undefined;
 
 export function updateReaderPopup() {
   const popup = addon.data.popup.currentPopup;
@@ -50,15 +53,23 @@ export function updateReaderPopup() {
   if (!task) {
     return;
   }
+  if (
+    task.itemId !== Number(popup.dataset.selectionItem) ||
+    normalizeSelection(task.raw) !== popup.dataset.selectionText
+  )
+    return;
   popup.setAttribute("translate-task-id", task.id);
 
-  if (task.audio.length > 0 && getPref("showPlayBtn")) {
-    audiobox.innerHTML = "";
+  const audioList = pronunciationAudio(task.raw);
+  if (!audioList.length) audioList.push(...task.audio);
+  audiobox.innerHTML = "";
+  updateHidden(audiobox, !audioList.length || !getPref("showPlayBtn"));
+  if (audioList.length > 0 && getPref("showPlayBtn")) {
     updateHidden(audiobox, false);
     ztoolkit.UI.appendElement(
       {
         tag: "fragment",
-        children: task.audio.map((audioData) => ({
+        children: audioList.map((audioData) => ({
           tag: "button",
           namespace: "html",
           classList: ["toolbar-button", "wide-button"],
@@ -67,9 +78,22 @@ export function updateReaderPopup() {
             title: audioData.text,
           },
           properties: {
-            innerHTML: `🔊 ${audioData.text}`,
-            onclick: () => {
-              new (ztoolkit.getGlobal("Audio"))(audioData.url).play();
+            textContent: `🔊 ${audioData.text}`,
+            onclick: async (event: Event) => {
+              playingAudio?.pause();
+              playingAudio = new (ztoolkit.getGlobal("Audio"))(audioData.url);
+              try {
+                await playingAudio.play();
+              } catch {
+                (event.currentTarget as HTMLButtonElement).title =
+                  "发音播放失败，请检查网络后重试";
+                new ztoolkit.ProgressWindow("发音")
+                  .createLine({
+                    text: "播放失败，请检查网络后重试",
+                    type: "default",
+                  })
+                  .show();
+              }
             },
           },
           styles: { whiteSpace: "nowrap", flexGrow: "1" },
@@ -123,6 +147,8 @@ export function buildReaderPopup(
   const annotation = event.params.annotation;
   const popup = doc.querySelector(".selection-popup") as HTMLDivElement;
   addon.data.popup.currentPopup = popup;
+  popup.dataset.selectionText = normalizeSelection(annotation.text || "");
+  popup.dataset.selectionItem = String(reader.itemID);
   popup.style.maxWidth = "none";
   popup.setAttribute(
     `${config.addonRef}-prefix`,
@@ -134,6 +160,84 @@ export function buildReaderPopup(
   const colors = popup.querySelector(".colors") as HTMLDivElement;
   colors.style.width = "100%";
   colors.style.justifyContent = "space-evenly";
+
+  // Populate the very annotation Zotero copies in its native color handler.
+  // Capture runs first; the normal handler still owns color, position and undo.
+  if (!colors.dataset.translateComment) {
+    colors.dataset.translateComment = "true";
+    let busy = false;
+    let replay = false;
+    colors.addEventListener(
+      "click",
+      async (ev) => {
+        const button = (ev.target as Element).closest<HTMLButtonElement>(
+          "button.color-button",
+        );
+        if (!button || replay) return;
+        const task = getLastTranslateTask({ type: "text" });
+        if (
+          !task ||
+          task.itemId !== reader.itemID ||
+          normalizeSelection(task.raw) !==
+            normalizeSelection(annotation.text || "")
+        )
+          return;
+        const saveComment = () => {
+          if (task.status !== "success" || !task.result.trim()) return false;
+          const textarea = popup.querySelector<HTMLTextAreaElement>(
+            `#${makeId("text")}`,
+          );
+          // Include user edits, but never save the source text or an error as a translation.
+          annotation.comment = textarea?.value.trim() || task.result.trim();
+          return true;
+        };
+        if (task.status === "success") {
+          saveComment();
+          return;
+        }
+        ev.preventDefault();
+        ev.stopImmediatePropagation();
+        if (busy) return;
+        busy = true;
+        try {
+          if (task.status === "waiting") {
+            await addon.hooks.onTranslate(task, {
+              noCheckZoteroItemLanguage: true,
+            });
+          } else {
+            const deadline = Date.now() + 30000;
+            while (task.status === "processing" && Date.now() < deadline) {
+              await Zotero.Promise.delay(100);
+            }
+          }
+          if (!popup.isConnected) return;
+          const saved = saveComment();
+          if (!saved) {
+            new ztoolkit.ProgressWindow("高亮译文")
+              .createLine({
+                text: "翻译未完成，已保留高亮；请稍后重译注释",
+                type: "default",
+              })
+              .show();
+          }
+        } catch {
+          new ztoolkit.ProgressWindow("高亮译文")
+            .createLine({ text: "翻译失败，已保留高亮", type: "default" })
+            .show();
+        } finally {
+          // A nested .click() during the original click dispatch is ignored.
+          await Zotero.Promise.delay(0);
+          if (popup.isConnected) {
+            replay = true;
+            button.click();
+          }
+          replay = false;
+          busy = false;
+        }
+      },
+      true,
+    );
+  }
 
   const keepSize = getPref("keepPopupSize") as boolean;
 

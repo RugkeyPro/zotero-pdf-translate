@@ -1,3 +1,24 @@
+# Zotero Translate — 轻量增强版
+
+基于 [windingwind/zotero-pdf-translate](https://github.com/windingwind/zotero-pdf-translate) **v2.4.8**，保留原作者署名与 **AGPL-3.0-or-later** 许可证。
+
+新增两项轻量功能：
+
+- **颜色按钮保存译文**：划词翻译后，点击颜色按钮，沿用 Zotero 原生高亮/下划线，并把当前译文（包括手动修订）保存到该注释的评论栏。翻译处理中会短暂等待；失败时保留高亮，不把错误信息当译文写入。
+- **英音 / 美音**：英文选区弹窗提供两个发音按钮，不依赖翻译服务是否返回音频。复用原插件已有的有道音频接口，点击时将选区原文发送给有道，需要联网。
+
+译文保存为 Zotero PDF 注释的评论，**不是把文字直接印在 PDF 正文上**。将 PDF 连同注释导出时可携带评论。
+
+从本仓库 [Releases](https://github.com/RugkeyPro/zotero-pdf-translate/releases) 下载 `.xpi`，在 Zotero「工具 → 插件 → 从文件安装插件」安装。插件 ID 保持不变，会替换原 Translate 插件并沿用原有设置。可安装上游 v2.4.8 恢复原版。
+
+构建：`npm ci --ignore-scripts && npm run build`（Node.js 24）。
+
+本地行为测试：`npm ci --prefix local-verification --ignore-scripts && node local-verification/selection.test.mjs`。
+
+已验证 TypeScript/构建、DOM 原生点击路径的译文保存/编辑/等待/失败/防串选区，以及英美两路音频 HTTP 200。已在 Zotero 本地加载；真实 PDF 划词后的声音与操作体验仍需用户验收。
+
+---
+
 # ![Translate for Zotero](addon/chrome/content/icons/favicon.png)Translate for Zotero
 
 [![zotero target version](https://img.shields.io/badge/Zotero-7/8-green?style=flat-square&logo=zotero&logoColor=CC2936)](https://www.zotero.org)
