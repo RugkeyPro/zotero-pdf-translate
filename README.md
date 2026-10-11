@@ -2,7 +2,9 @@
 
 基于 [windingwind/zotero-pdf-translate](https://github.com/windingwind/zotero-pdf-translate) **v2.4.8**，保留原作者署名与 **AGPL-3.0-or-later** 许可证。
 
-## 独立文献对话面板（v2.4.8-local.6）
+## 独立文献对话面板（v2.4.8-local.7）
+
+公式支持 LaTeX 行内/独立渲染为 MathML，点击公式或选择后复制，可将完整公式粘贴到支持 MathML 的 Word 中继续编辑。
 
 界面支持在设置中调节 12–22px 字号并记忆，回答文字可选中并通过右键复制；模型选择采用可搜索的圆角菜单，显示名称、用途提示和选中标记。
 

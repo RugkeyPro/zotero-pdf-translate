@@ -1,3 +1,4 @@
+import { mathElement } from "./math";
 // Render a small Markdown subset using text nodes; never insert model HTML.
 export function renderMarkdown(
   doc: Document,
@@ -8,21 +9,29 @@ export function renderMarkdown(
     doc.createElementNS("http://www.w3.org/1999/xhtml", tag) as HTMLElement;
   const inline = (node: HTMLElement, source: string) => {
     const pattern =
-      /(`[^`\n]+`|\*\*[^*\n]+\*\*|\*[^*\n]+\*|\[[^\]\n]+\]\(https?:\/\/[^\s)]+\))/g;
+      /(`[^`\n]+`|\$\$[\s\S]+?\$\$|\\\[[\s\S]+?\\\]|\\\([\s\S]+?\\\)|(?<!\\)\$(?!\$)[^$\n]+?\$|\*\*[^*\n]+\*\*|\*[^*\n]+\*|\[[^\]\n]+\]\(https?:\/\/[^\s)]+\))/g;
     let at = 0;
     for (const match of source.matchAll(pattern)) {
       node.append(doc.createTextNode(source.slice(at, match.index)));
       const token = match[0];
       let child: HTMLElement;
-      if (token.startsWith("`")) {
+      if (
+        token.startsWith("$") ||
+        token.startsWith("\\[") ||
+        token.startsWith("\\(")
+      ) {
+        const display = token.startsWith("$$") || token.startsWith("\\[");
+        const trim = token.startsWith("$") && !display ? 1 : 2;
+        child = mathElement(doc, token.slice(trim, -trim).trim(), display);
+      } else if (token.startsWith("`")) {
         child = el("code");
         child.textContent = token.slice(1, -1);
       } else if (token.startsWith("**")) {
         child = el("strong");
-        child.textContent = token.slice(2, -2);
+        inline(child, token.slice(2, -2));
       } else if (token.startsWith("*")) {
         child = el("em");
-        child.textContent = token.slice(1, -1);
+        inline(child, token.slice(1, -1));
       } else {
         const m = token.match(/^\[([^\]]+)\]\((.+)\)$/)!;
         child = el("a");
@@ -59,6 +68,22 @@ export function renderMarkdown(
       code.textContent = content.join("\n");
       pre.append(code);
       target.append(pre);
+      continue;
+    }
+    if (/^\s*(\$\$|\\\[)/.test(line)) {
+      flush();
+      const content = [line];
+      const closing = line.trim().startsWith("$$") ? "$$" : "\\]";
+      const openingLength = line.indexOf(line.trim()) + 2;
+      if (!line.slice(openingLength).includes(closing)) {
+        while (i + 1 < lines.length) {
+          content.push(lines[++i]);
+          if (lines[i].includes(closing)) break;
+        }
+      }
+      const p = el("div");
+      inline(p, content.join("\n"));
+      target.append(p);
       continue;
     }
     if (!line.trim()) {

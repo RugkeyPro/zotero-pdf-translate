@@ -17,6 +17,7 @@ import {
   selections,
   changed,
 } from "./chat";
+import { equationClipboard, selectionClipboard, copyMathContent } from "./math";
 import { renderMarkdown } from "./markdown";
 import { getPref, setPref } from "../../utils/prefs";
 import { configureProvider, getProvider, listModels } from "./provider";
@@ -24,6 +25,7 @@ const CSS = `
 .agent-pane{width:100%;min-width:0;font:var(--agent-font-size,13px) -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--color-paned-text,#252a31);background:linear-gradient(155deg,var(--material-background,#fff) 55%,#eaf2ff);border-radius:16px;display:flex;flex-direction:column;min-height:470px;height:100%;max-height:none;box-sizing:border-box;overflow:hidden;border:1px solid var(--color-border,#e3e8ef)}
 .agent-pane *{box-sizing:border-box}.agent-pane button,.agent-pane select,.agent-pane input,.agent-pane textarea{font:inherit;color:inherit}.agent-pane button{appearance:none;display:inline-flex;align-items:center;justify-content:center;line-height:1.3;margin:0;min-width:0;min-height:0;cursor:pointer;border:0;background:transparent;border-radius:16px;padding:7px 11px}.agent-pane button:hover{background:#dfe9fb;color:#243b63}.agent-pane button:disabled{opacity:.45;cursor:default}.agent-top{display:flex;gap:4px;padding:10px 9px;align-items:center}.agent-top select{min-width:0;width:0;flex:1;background:transparent;border:0;text-overflow:ellipsis}.agent-title{font-size:12px;padding:0 14px;color:var(--color-text-secondary,#5e6571);line-height:1.5;max-height:38px;overflow:hidden}.agent-thread{flex:1;overflow-y:auto;padding:14px;min-height:180px}.agent-welcome{padding:36px 5px}.agent-star{font-size:34px;background:linear-gradient(30deg,#4285f4,#8b72e5,#d96fb3,#e9b942);background-clip:text;color:transparent}.agent-welcome h2{font-size:24px;font-weight:500;line-height:1.35;margin:12px 0 25px}.agent-suggestions{display:flex;flex-direction:column;align-items:flex-start;gap:9px}.agent-suggestions button{background:var(--material-background,#fff);border:1px solid var(--color-border,#e0e5ed);box-shadow:0 2px 8px #00000006;text-align:left}.agent-message{margin:0 0 18px;line-height:1.65;overflow-wrap:anywhere}.agent-message.user{background:#e8edf8;color:#25334c;border-radius:16px;padding:10px 12px;margin-left:24px}.agent-message.assistant .agent-label{font-size:11px;color:var(--color-text-secondary,#697386);margin-bottom:6px}.agent-prose{white-space:normal}.agent-prose p{margin:0 0 12px;line-height:1.75;white-space:pre-wrap}.agent-prose h3{font-size:15px;margin:18px 0 9px;font-weight:600}.agent-prose ul,.agent-prose ol{padding-left:22px;margin:8px 0 14px}.agent-prose li{margin:5px 0}.agent-prose code{font-size:12px;background:#7d87a414;padding:2px 4px;border-radius:4px}.agent-prose pre{overflow:auto;white-space:pre;padding:12px;background:#7d87a414;border-radius:10px}.agent-prose pre code{background:transparent;padding:0}.agent-prose blockquote{border-left:3px solid #bbc8ea;margin:10px 0;padding-left:12px;color:var(--color-text-secondary,#5c667a)}.agent-table{overflow:auto}.agent-prose table{border-collapse:collapse;font-size:12px}.agent-prose td,.agent-prose th{padding:7px 9px;border:1px solid var(--color-border,#ddd);text-align:left}.agent-heading{display:flex;align-items:center;gap:9px;padding:12px 16px;font-size:16px}.agent-heading .agent-star{font-size:25px}.agent-heading button{margin-left:auto;width:36px;height:32px;padding:0;flex-shrink:0}.agent-heading button svg{display:block;width:18px;height:18px;pointer-events:none}.agent-top button,.agent-send{width:32px;height:28px;padding:0;flex-shrink:0}.agent-suggestions button{height:auto;white-space:normal}.agent-selected{display:flex;align-items:flex-start;gap:6px}.agent-selected[hidden]{display:none}.agent-selected div{flex:1;min-width:0;max-height:90px;overflow:auto}.agent-selected button{padding:0 5px}.agent-title{font-size:11px!important;opacity:.8}.agent-top{padding-top:0}.agent-message details{font-size:11px;margin-top:8px}.agent-message details p{white-space:pre-wrap;border-left:2px solid #9baff1;padding-left:8px;max-height:240px;overflow:auto}.agent-message .agent-save{font-size:11px;padding-left:0}.agent-status{font-size:11px;color:var(--color-text-secondary,#61708a);padding:0 14px 6px;min-height:21px}.agent-compose{margin:0 10px 10px;padding:10px;border:1px solid var(--color-border,#dce3ed);background:var(--material-background,#fff);border-radius:20px;box-shadow:0 2px 10px #00000008}.agent-context{font-size:11px;margin-bottom:5px;display:flex;gap:6px;align-items:center}.agent-context select{max-width:110px;border:0;background:transparent}.agent-context span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;color:var(--color-text-secondary,#697386)}.agent-compose textarea{width:100%;min-height:55px;max-height:130px;resize:vertical;border:0;outline:none;background:transparent;line-height:1.5}.agent-actions{display:flex;align-items:center;justify-content:space-between;gap:4px}.agent-actions select{min-width:0;font-size:11px;border:0;background:transparent;max-width:75%;width:0;flex:1}.agent-send{background:#dce9ff!important;color:#294983!important}.agent-settings{padding:10px;border-bottom:1px solid var(--color-border,#e0e5ed)}.agent-settings input{width:100%;margin-bottom:7px;border:1px solid var(--color-border,#ddd);border-radius:8px;padding:6px;background:var(--material-background,#fff)}.agent-privacy{font-size:10px;line-height:1.5;color:var(--color-text-secondary,#7a818e);padding:0 14px 10px}.agent-selected{font-size:11px;max-height:60px;overflow:auto;white-space:pre-wrap;background:#edf3ff;color:#3b4b67;border-radius:8px;margin-bottom:6px;padding:6px}
 .agent-thread,.agent-thread *,.agent-selected div{user-select:text!important;-moz-user-select:text!important;cursor:auto}.agent-thread button,.agent-thread summary{cursor:pointer}.agent-prose h3{font-size:1.15em}.agent-prose code,.agent-prose table{font-size:.92em}.agent-pane [hidden]{display:none!important}.agent-font{display:flex;align-items:center;gap:10px;padding:3px 0 12px}.agent-font input{width:auto;flex:1;margin:0;padding:0}.agent-font output{min-width:3em;text-align:right}.agent-actions{position:relative}.agent-model-trigger{max-width:80%;gap:8px;text-align:left;font-size:.92em!important;padding:8px 12px!important;border-radius:20px!important;background:#7d87a412!important}.agent-model-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.agent-model-popover{position:absolute;bottom:calc(100% + 12px);left:0;width:100%;max-height:min(460px,60vh);padding:10px;background:var(--material-background,#fff);border:1px solid var(--color-border,#e2e5eb);border-radius:20px;box-shadow:0 8px 32px #0000001c;z-index:10;display:flex;flex-direction:column;gap:8px}.agent-model-popover input{width:100%;border:1px solid var(--color-border,#e2e5eb);border-radius:12px;padding:9px 12px;background:transparent}.agent-model-list{overflow:auto;min-height:0}.agent-model-list button{appearance:none!important;height:auto!important;max-height:none!important;min-height:68px!important;flex-shrink:0;display:flex;width:100%;padding:12px 14px;gap:12px;text-align:left;border-radius:12px}.agent-model-list button[aria-checked="true"]{background:#7d87a412}.agent-model-info{flex:1;min-width:0;overflow-wrap:anywhere}.agent-model-info strong{display:block;font-weight:500}.agent-model-info small{display:block;color:var(--color-text-secondary,#787d85);margin-top:5px;font-size:.86em}.agent-model-note{font-size:.8em;color:var(--color-text-secondary,#787d85);border-top:1px solid var(--color-border,#e2e5eb);padding:10px 12px 2px}.agent-copy-menu{position:fixed;z-index:20;background:var(--material-background,#fff);border:1px solid var(--color-border,#ddd);border-radius:10px;padding:4px;box-shadow:0 4px 16px #0002}
+.agent-math{cursor:pointer;display:inline-block;vertical-align:middle;border-radius:4px}.agent-math:hover{background:#7d87a416}.agent-math math{font-size:1.08em}.agent-math-block{display:block;overflow-x:auto;padding:12px 4px;text-align:center}.agent-math-error{font-family:monospace}.agent-math annotation{display:none}
 @media(prefers-color-scheme:dark){.agent-message.user,.agent-selected{background:#29334a;color:#dce5f7}.agent-pane button:hover{background:#303f5b;color:#dce5f7}.agent-send{background:#334970!important;color:#e1eaff!important}}
 `;
 export class AgentPanel {
@@ -332,6 +334,15 @@ export class AgentPanel {
     }
   }
   private click = (event: Event) => {
+    const equation = (event.target as Element).closest?.(".agent-math");
+    if (equation && this.thread.contains(equation)) {
+      const payload = equationClipboard(this.doc, equation);
+      if (payload) {
+        copyMathContent(payload);
+        this.status.textContent = "已复制完整公式，可直接粘贴到 Word";
+      }
+      return;
+    }
     const action = (event.target as HTMLElement).closest<HTMLElement>(
       "[data-action]",
     )?.dataset.action;
@@ -504,9 +515,15 @@ export class AgentPanel {
     ) {
       event.preventDefault();
       event.stopPropagation();
-      new ztoolkit.Clipboard()
-        .addText(selection.toString(), "text/plain")
-        .copy();
+      copyMathContent(selectionClipboard(this.doc, selection));
+      return;
+    }
+    if (
+      (event.key === "Enter" || event.key === " ") &&
+      (event.target as Element).closest?.(".agent-math")
+    ) {
+      event.preventDefault();
+      (event.target as HTMLElement).click();
       return;
     }
     if (event.key === "Escape") {
@@ -533,8 +550,9 @@ export class AgentPanel {
     if (this.doc.defaultView?.getSelection()?.isCollapsed) this.schedule();
   };
   private copyMenu = (event: MouseEvent) => {
-    const selected = this.doc.defaultView?.getSelection()?.toString();
-    if (!selected) return;
+    const selection = this.doc.defaultView?.getSelection();
+    if (!selection || !selection.toString()) return;
+    const payload = selectionClipboard(this.doc, selection);
     event.preventDefault();
     event.stopPropagation();
     this.body.querySelector(".agent-copy-menu")?.remove();
@@ -544,7 +562,7 @@ export class AgentPanel {
     copy.type = "button";
     copy.textContent = "复制";
     copy.onclick = () => {
-      new ztoolkit.Clipboard().addText(selected, "text/plain").copy();
+      copyMathContent(payload);
       menu.remove();
     };
     menu.append(copy);

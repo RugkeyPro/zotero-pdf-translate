@@ -3,7 +3,7 @@ import {JSDOM} from 'jsdom';
 import {writeFileSync} from 'node:fs';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-const combined=await build({stdin:{contents: ['context','storage','provider','chat','panel','markdown','vision'].map(name=>`export * from "./src/modules/agent/${name}.ts";`).join('\n'),resolveDir:process.cwd(),loader:'ts'},bundle:true,format:'esm',write:false,plugins:[{name:'prefs',setup(b){b.onResolve({filter:/utils\/prefs$/},a=>({path:a.path,namespace:'prefs'}));b.onLoad({filter:/.*/,namespace:'prefs'},()=>({contents:'export const getPref=k=>globalThis.prefs[k]; export const setPref=(k,v)=>globalThis.prefs[k]=v;'}));}}]});writeFileSync(new URL('.agent-all.mjs',import.meta.url),combined.outputFiles[0].text);
+const combined=await build({stdin:{contents: ['context','storage','provider','chat','panel','markdown','vision','math'].map(name=>`export * from "./src/modules/agent/${name}.ts";`).join('\n'),resolveDir:process.cwd(),loader:'ts'},bundle:true,format:'esm',write:false,plugins:[{name:'prefs',setup(b){b.onResolve({filter:/utils\/prefs$/},a=>({path:a.path,namespace:'prefs'}));b.onLoad({filter:/.*/,namespace:'prefs'},()=>({contents:'export const getPref=k=>globalThis.prefs[k]; export const setPref=(k,v)=>globalThis.prefs[k]=v;'}));}}]});writeFileSync(new URL('.agent-all.mjs',import.meta.url),combined.outputFiles[0].text);
 const context=await import('./.agent-all.mjs');
 assert.ok(context.splitSource('pdf','x'.repeat(4000),'A').length===3);
 assert.equal(context.searchChunks([{id:'a',source:'pdf',text:'river mercury coastal oceans'},{id:'b',source:'pdf',text:'unrelated methods'}],'mercury')[0].id,'a');
@@ -55,3 +55,17 @@ const pages=context.splitPDF('PDF','first page\fsecond page','KEY');assert.equal
 let renderedPages=0;Zotero.Utilities.Internal={md5:s=>createHash('md5').update(s).digest('hex')};Zotero.Items.getByLibraryAndKey=(_lib,key)=>[...items.values()].find(i=>i.key===key);IOUtils.read=async()=>new Uint8Array([1,2,3]);Zotero.PDFWorker={_enqueue:job=>job(),_query:async()=>{renderedPages++;return {buf:new Uint8Array([137,80,78,71]).buffer};}};
 const currentCorpus=await storage.getCorpus(parent);const imageA=await context.readPDFPage(parent,currentCorpus,'AAA',1);assert.ok(imageA.image.startsWith('data:image/png;base64,'));await context.readPDFPage(parent,currentCorpus,'AAA',1);assert.equal(renderedPages,1,'repeat visual reads use page cache');await assert.rejects(()=>context.readPDFPage(parent,currentCorpus,'FOREIGN',1));const changedCorpus={...currentCorpus,pdfStamps:{...currentCorpus.pdfStamps,AAA:'updated'}};await context.readPDFPage(parent,changedCorpus,'AAA',1);assert.equal(renderedPages,2,'modified PDF invalidates page image');assert.equal(context.splitPDF('scan','','SCAN',3).length,3,'scanned page still has a readable image index');
 console.log('PASS: all-PDF corpus, incremental PDF/notes cache, item isolation, multiple persisted chats, fragmented SSE, local tool loop, automatic selection with item context, safe Markdown and PDF page mapping, cancellation, history compression, safe child-note creation and panel item switching.');
+
+const mathTest=window.document.createElement('div');window.document.body.append(mathTest);context.renderMarkdown(window.document,mathTest,String.raw`单位 $\mathrm{ng\,m^{-3}\,yr^{-1}}$ 与 **$\mathrm{Hg}^{II}$**，行内 \(\frac{a}{b}\)。
+
+$$
+F=\sum_{i=1}^{n} Q_i C_i
+$$
+
+\[
+\begin{pmatrix}a&b\\c&d\end{pmatrix}
+\]
+
+`+'`$literal$`');assert.equal(mathTest.querySelectorAll('math').length,5);assert.equal(mathTest.querySelectorAll('annotation').length,0);assert.ok(mathTest.querySelector('mfrac'));assert.ok(mathTest.querySelector('mtable'));const eq=mathTest.querySelector('.agent-math');const equationPayload=context.equationClipboard(window.document,eq);assert.match(equationPayload.plain,/<math xmlns="http:\/\/www.w3.org\/1998\/Math\/MathML"/);assert.ok(!equationPayload.plain.includes('data-latex'));const mathRange=window.document.createRange();mathRange.selectNodeContents(mathTest);window.getSelection().removeAllRanges();window.getSelection().addRange(mathRange);const mixedPayload=context.selectionClipboard(window.document,window.getSelection());assert.ok(mixedPayload.html.includes('<mfrac>'));assert.ok(!mixedPayload.html.includes('annotation'));assert.match(mixedPayload.plain,/单位/);window.getSelection().removeAllRanges();console.log('PASS: inline/display MathML, units, matrices, nested bold math, literal code and structured equation/mixed selection clipboard.');
+
+const partialMath=mathTest.querySelector('msup mi')||mathTest.querySelector('mi');const partialRange=window.document.createRange();partialRange.selectNodeContents(partialMath);window.getSelection().addRange(partialRange);assert.match(context.selectionClipboard(window.document,window.getSelection()).plain,/<math/);window.getSelection().removeAllRanges();const unsafeMath=context.mathElement(window.document,String.raw`\href{javascript:alert(1)}{x}`);assert.equal(unsafeMath.querySelector('a'),null);assert.equal(unsafeMath.querySelector('script'),null);
