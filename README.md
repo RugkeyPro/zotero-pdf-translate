@@ -2,7 +2,9 @@
 
 基于 [windingwind/zotero-pdf-translate](https://github.com/windingwind/zotero-pdf-translate) **v2.4.8**，保留原作者署名与 **AGPL-3.0-or-later** 许可证。
 
-## 独立文献对话面板（v2.4.8-local.7）
+## 独立文献对话面板（v2.4.8-local.8）
+
+PDF 引用编号可点击：打开对应附件并跳到引用页，文字匹配成功时临时高亮引用片段；不会添加永久注释。
 
 公式支持 LaTeX 行内/独立渲染为 MathML，点击公式或选择后复制，可将完整公式粘贴到支持 MathML 的 Word 中继续编辑。
 

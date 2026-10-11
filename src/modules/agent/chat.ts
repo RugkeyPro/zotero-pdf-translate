@@ -266,9 +266,9 @@ export async function sendChat(
       messages.push(...visuals);
     }
     for (const id of answer.content.match(
-      /\[(PDF[^\]]+|NOTE[^\]]+|ANN[^\]]+|META-\d+|SELECTION-1)\]/g,
+      /\b(?:PDF[A-Z0-9]+P\d+-\d+|NOTE[A-Z0-9]+-\d+|ANN[A-Z0-9]+-\d+|META-\d+)\b/g,
     ) || []) {
-      const source = corpus.chunks.find((c) => c.id === id.slice(1, -1));
+      const source = corpus.chunks.find((c) => c.id === id);
       if (source) referenced.set(source.id, source);
     }
     answer.sources = [...referenced.values()];
