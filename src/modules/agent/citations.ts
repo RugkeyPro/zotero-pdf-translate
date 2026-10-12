@@ -1,3 +1,4 @@
+import { figureRects, evidenceStamp } from "./evidence";
 import { SourceChunk } from "./context";
 import { getCorpus, rootItem } from "./storage";
 export interface PDFChar {
@@ -19,42 +20,33 @@ export function sourceRects(chars: PDFChar[], text: string): number[][] {
     for (let j = 0; j < value.length; j++) offsets.push(i);
   }
   const source = normalize(text);
-  for (const length of [180, 80, 40]) {
-    for (const offset of [0, 100, 250, 400]) {
-      const needle = source.slice(offset, offset + length);
-      if (needle.length < 35) continue;
-      const at = haystack.indexOf(needle);
-      if (at < 0) continue;
-      const rectangles: number[][] = [];
-      for (let i = offsets[at]; i <= offsets[at + needle.length - 1]; i++) {
-        const original = chars[i].rect;
-        if (
-          !original ||
-          original.length !== 4 ||
-          !original.every(Number.isFinite)
-        )
-          continue;
-        const rect = [
-          Math.min(original[0], original[2]),
-          Math.min(original[1], original[3]),
-          Math.max(original[0], original[2]),
-          Math.max(original[1], original[3]),
-        ];
-        const last = rectangles.at(-1);
-        if (
-          last &&
-          Math.abs(last[1] - rect[1]) < 2 &&
-          Math.abs(last[3] - rect[3]) < 2 &&
-          rect[0] >= last[0] &&
-          rect[0] - last[2] < 20
-        ) {
-          last[2] = Math.max(last[2], rect[2]);
-        } else rectangles.push([...rect]);
-      }
-      if (rectangles.length) return rectangles;
-    }
+  const needle = source;
+  if (needle.length < 32) return [];
+  const at = haystack.indexOf(needle);
+  if (at < 0 || haystack.indexOf(needle, at + 1) >= 0) return [];
+  const rectangles: number[][] = [];
+  for (let i = offsets[at]; i <= offsets[at + needle.length - 1]; i++) {
+    const original = chars[i].rect;
+    if (!original || original.length !== 4 || !original.every(Number.isFinite))
+      continue;
+    const rect = [
+      Math.min(original[0], original[2]),
+      Math.min(original[1], original[3]),
+      Math.max(original[0], original[2]),
+      Math.max(original[1], original[3]),
+    ];
+    const last = rectangles.at(-1);
+    if (
+      last &&
+      Math.abs(last[1] - rect[1]) < 2 &&
+      Math.abs(last[3] - rect[3]) < 2 &&
+      rect[0] >= last[0] &&
+      rect[0] - last[2] < 20
+    ) {
+      last[2] = Math.max(last[2], rect[2]);
+    } else rectangles.push([...rect]);
   }
-  return [];
+  return rectangles;
 }
 const positions = new Map<string, number[][]>();
 const views = new WeakMap<object, number>();
@@ -85,14 +77,31 @@ export async function openCitation(
   )
     throw Error("引用的 PDF 不属于当前条目，或附件已移除");
   if (!(await pdf.getFilePathAsync())) throw Error("引用的 PDF 文件不可用");
+  const corpus = source.anchor ? await getCorpus(root) : undefined;
+  if (
+    source.anchor?.stamp &&
+    evidenceStamp(corpus?.pdfStamps?.[source.attachmentKey]) !==
+      evidenceStamp(source.anchor.stamp)
+  )
+    throw Error("PDF 已变化，请重新提问以核对引用位置");
   const pageIndex = source.pageIndex!;
-  const reader = await Zotero.Reader.open(pdf.id, {
+  let reader = await Zotero.Reader.open(pdf.id, {
     pageIndex: pageIndex,
   });
+  // A restored/unloaded attachment tab opens asynchronously and initially returns undefined.
+  for (let attempt = 0; !reader && attempt < 40; attempt++) {
+    await new Promise((resolve) =>
+      Zotero.getMainWindow().setTimeout(resolve, 150),
+    );
+    reader = (Zotero.Reader as any)._readers?.find(
+      (r: any) => r.itemID === pdf.id && !r._isTabClosed,
+    );
+  }
   if (!reader) return { pageIndex: pageIndex, located: false };
   // Native reader internals differ across Zotero versions; page navigation always remains available.
   let rectangles: number[][] = [];
   try {
+    if ((reader as any)._initPromise) await (reader as any)._initPromise;
     const native = (reader as any)._internalReader;
     const view = native?._primaryView;
     if (view?.initializedPromise) await view.initializedPromise;
@@ -112,7 +121,10 @@ export async function openCitation(
         if (doc?.getPageData) data = await doc.getPageData({ pageIndex });
       }
       if (data) {
-        rectangles = sourceRects(data.chars || [], source.text);
+        rectangles = sourceRects(
+          data.chars || [],
+          source.anchor?.quote || source.text,
+        );
         if (positions.size >= 64)
           positions.delete(positions.keys().next().value!);
         positions.set(key, rectangles);
@@ -122,6 +134,8 @@ export async function openCitation(
     const viewer = (iframe?.wrappedJSObject || iframe)?.PDFViewerApplication
       ?.pdfViewer;
     const bounds = viewer?._pages?.[pageIndex]?.viewport?.viewBox;
+    if (bounds && source.anchor?.kind === "figure" && source.anchor.region)
+      rectangles = figureRects(source.anchor.region, bounds);
     if (bounds)
       rectangles = rectangles.filter(
         (r) =>

@@ -3,7 +3,7 @@ import {JSDOM} from 'jsdom';
 import {writeFileSync} from 'node:fs';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-const combined=await build({stdin:{contents: ['context','storage','provider','chat','panel','markdown','vision','math','citations'].map(name=>`export * from "./src/modules/agent/${name}.ts";`).join('\n'),resolveDir:process.cwd(),loader:'ts'},bundle:true,format:'esm',write:false,plugins:[{name:'prefs',setup(b){b.onResolve({filter:/utils\/prefs$/},a=>({path:a.path,namespace:'prefs'}));b.onLoad({filter:/.*/,namespace:'prefs'},()=>({contents:'export const getPref=k=>globalThis.prefs[k]; export const setPref=(k,v)=>globalThis.prefs[k]=v;'}));}}]});writeFileSync(new URL('.agent-all.mjs',import.meta.url),combined.outputFiles[0].text);
+const combined=await build({stdin:{contents: ['context','storage','provider','chat','panel','markdown','vision','math','citations','evidence'].map(name=>`export * from "./src/modules/agent/${name}.ts";`).join('\n'),resolveDir:process.cwd(),loader:'ts'},bundle:true,format:'esm',write:false,plugins:[{name:'prefs',setup(b){b.onResolve({filter:/utils\/prefs$/},a=>({path:a.path,namespace:'prefs'}));b.onLoad({filter:/.*/,namespace:'prefs'},()=>({contents:'export const getPref=k=>globalThis.prefs[k]; export const setPref=(k,v)=>globalThis.prefs[k]=v;'}));}}]});writeFileSync(new URL('.agent-all.mjs',import.meta.url),combined.outputFiles[0].text);
 const context=await import('./.agent-all.mjs');
 assert.ok(context.splitSource('pdf','x'.repeat(4000),'A').length===3);
 assert.equal(context.searchChunks([{id:'a',source:'pdf',text:'river mercury coastal oceans'},{id:'b',source:'pdf',text:'unrelated methods'}],'mercury')[0].id,'a');
@@ -71,3 +71,32 @@ $$
 const partialMath=mathTest.querySelector('msup mi')||mathTest.querySelector('mi');const partialRange=window.document.createRange();partialRange.selectNodeContents(partialMath);window.getSelection().addRange(partialRange);assert.match(context.selectionClipboard(window.document,window.getSelection()).plain,/<math/);window.getSelection().removeAllRanges();const unsafeMath=context.mathElement(window.document,String.raw`\href{javascript:alert(1)}{x}`);assert.equal(unsafeMath.querySelector('a'),null);assert.equal(unsafeMath.querySelector('script'),null);
 
 let openedPDF, navigated;const citationText='River mercury exports to coastal oceans are an important input and this sentence locates the reference.';const citationChars=Array.from(citationText).map((c,i)=>({u:c,rect:[i*5,100,i*5+5,110]}));Zotero.Reader={open:async(id,location)=>{openedPDF={id,location};return {_internalReader:{_primaryView:{_iframeWindow:{PDFViewerApplication:{pdfDocument:{getPageData:async()=>({chars:citationChars})}}}}},navigate:async location=>navigated=location}}};const citationSource={id:'PDFPKEYP3-1',source:'PDF',text:citationText,attachmentKey:'AAA',pageIndex:2};const opened=await context.openCitation(parent,citationSource.id,[citationSource]);assert.equal(openedPDF.id,2);assert.equal(openedPDF.location.pageIndex,2);assert.equal(navigated.position.pageIndex,2);assert.ok(navigated.position.rects.length);assert.equal(opened.located,true);await assert.rejects(()=>context.openCitation(other,citationSource.id,[citationSource]),/不属于/);assert.deepEqual(context.sourceRects(citationChars,'unrelated fragment without a shared contiguous passage'),[]);context.renderMarkdown(window.document,mathTest,'[PDFPKEYP3-1, PDFPKEYP3-2]',id=>{const a=window.document.createElement('a');a.dataset.sourceId=id;a.textContent=id;return a;});assert.equal(mathTest.querySelectorAll('a').length,2);assert.match(mathTest.textContent,/PDFPKEYP3-1, PDFPKEYP3-2/);console.log('PASS: grouped citation links, attachment ownership, PDF page navigation and temporary source coordinates.');
+
+const exactA='The river mercury input is approximately thirty two times atmospheric deposition.';
+const exactB='Supplementary uncertainty estimates account for changes in seasonal river discharge.';
+const full='NATURE GEOSCIENCE HEADER '+exactA+' Fig. 2 | Mercury inputs into coastal oceans from external sources. '+exactB;
+const chars=Array.from(full).map((u,i)=>({u,rect:[i,10,i+1,20]}));
+assert.equal(context.sourceRects(chars,exactA)[0][0],full.indexOf(exactA));
+assert.equal(context.sourceRects(chars,exactB)[0][0],full.indexOf(exactB));
+assert.deepEqual(context.sourceRects(chars,full+' invented continuation'),[]);
+assert.deepEqual(context.sourceRects([...chars,...chars],exactA),[]);
+const groundingCorpus={chunks:[{id:'PDFBBBP2-1',attachmentKey:'BBB',pageIndex:1,source:'Supplementary PDF',text:full}],pdfStamps:{BBB:'stamp'}};
+const grounded=context.registerEvidence(groundingCorpus,groundingCorpus.chunks[0],{kind:'text',quote:exactB},new Set());
+assert.equal(grounded.attachmentKey,'BBB');assert.equal(grounded.pageIndex,1);assert.match(grounded.id,/-T[A-F0-9]+$/);assert.equal(grounded.anchor.quote,exactB);
+assert.throws(()=>context.registerEvidence(groundingCorpus,groundingCorpus.chunks[0],{kind:'text',quote:exactB.replace('seasonal','annual')},new Set()),/逐字/);
+const fig={kind:'figure',quote:'Fig. 2 | Mercury inputs into coastal oceans from external sources.',figure_label:'Fig. 2',region:[.1,.2,.9,.7]};
+assert.throws(()=>context.registerEvidence(groundingCorpus,groundingCorpus.chunks[0],fig,new Set()),/实际读取/);
+const figure=context.registerEvidence(groundingCorpus,groundingCorpus.chunks[0],fig,new Set(['BBB:2']));assert.equal(figure.anchor.kind,'figure');
+assert.throws(()=>context.registerEvidence(groundingCorpus,groundingCorpus.chunks[0],{...fig,region:[0,0,1,1]},new Set(['BBB:2'])),/整页/);
+assert.throws(()=>context.registerEvidence(groundingCorpus,groundingCorpus.chunks[0],{...fig,figure_label:'Fig. 3'},new Set(['BBB:2'])),/图号/);
+assert.deepEqual(context.figureRects([.1,.2,.9,.7],[0,0,600,800]),[[60,240,540,640]]);
+context.renderMarkdown(window.document,mathTest,`[${grounded.id}, ${figure.id}]`,id=>{const a=window.document.createElement('a');a.textContent=id;return a;});assert.equal(mathTest.querySelectorAll('a').length,2);
+console.log('PASS: exact distinct passages, ambiguous and invented quote rejection, supplementary PDF provenance, viewed-figure and caption validation, image coordinates, evidence links.');
+
+let delayedReader;Zotero.Reader.open=async()=>{delayedReader={itemID:2,_isTabClosed:false,_initPromise:Promise.resolve().then(()=>{delayedReader._internalReader={_primaryView:{_pdfPages:{2:{chars:citationChars}}}}}),navigate:async l=>navigated=l};return delayedReader;};assert.equal((await context.openCitation(parent,citationSource.id,[citationSource])).located,true);
+Zotero.Reader._readers=[delayedReader];Zotero.Reader.open=async()=>undefined;assert.equal((await context.openCitation(parent,citationSource.id,[citationSource])).located,true);
+console.log('PASS: newly opened and restored attachment readers wait for initialization before exact text navigation.');
+
+assert.equal(context.evidenceStamp('["BBB",123,456,"old metadata"]'),context.evidenceStamp('["BBB",123,456,"new metadata"]'));assert.notEqual(context.evidenceStamp('["BBB",123,456,"same"]'),context.evidenceStamp('["BBB",999,456,"same"]'));console.log('PASS: PDF content stamps ignore attachment metadata changes but detect modified files.');
+
+const subCorpus={...groundingCorpus,chunks:[{...groundingCorpus.chunks[0],text:'Fig. 2 | Mercury inputs into coastal oceans from external sources. b, Comparison of input rates of Hg between coastal and open oceans.'}]};assert.equal(context.registerEvidence(subCorpus,subCorpus.chunks[0],{...fig,quote:subCorpus.chunks[0].text,figure_label:'Figure 2b'},new Set(['BBB:2'])).anchor.figureLabel,'Figure 2b');assert.throws(()=>context.registerEvidence(subCorpus,subCorpus.chunks[0],{...fig,quote:subCorpus.chunks[0].text,figure_label:'Fig. 2c'},new Set(['BBB:2'])),/子图/);console.log('PASS: figure/subfigure caption matching accepts Fig. 2b with its b caption and rejects absent panels.');

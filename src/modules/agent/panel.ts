@@ -1,5 +1,6 @@
+import { resolveEvidence, evidenceKey } from "./evidence";
 import { openCitation } from "./citations";
-import { ItemChats, Conversation } from "./context";
+import { ItemChats, Conversation, Message } from "./context";
 import {
   rootItem,
   itemKey,
@@ -35,6 +36,7 @@ export class AgentPanel {
   private state?: ItemChats;
   private ticket = 0;
   private disposed = false;
+  private locating = false;
   private models = [DEFAULT_MODEL];
   private unsubscribe: () => void;
   private scheduled = false;
@@ -266,7 +268,7 @@ export class AgentPanel {
           this.doc,
           text,
           m.content || (busy ? "正在思考…" : ""),
-          (id) => this.citationLink(id),
+          (id) => this.citationLink(id, m),
         );
       else text.textContent = m.content;
       card.append(text);
@@ -288,7 +290,7 @@ export class AgentPanel {
           const p = this.el("p");
           if (source.attachmentKey && source.pageIndex !== undefined)
             p.append(
-              this.citationLink(source.id),
+              this.citationLink(source.id, m),
               this.doc.createTextNode(` ${source.source}\n${source.text}`),
             );
           else
@@ -346,11 +348,14 @@ export class AgentPanel {
       this.status.textContent = "会话保存失败，请检查数据目录权限";
     }
   }
-  private citationLink(id: string) {
+  private citationLink(id: string, message: Message) {
     const link = this.el("a");
     link.href = "#";
     link.className = "agent-citation";
     link.dataset.sourceId = id;
+    link.dataset.messageIndex = String(
+      this.current()?.messages.indexOf(message),
+    );
     link.textContent = id;
     link.title = "打开对应 PDF，定位引用原文";
     return link;
@@ -361,19 +366,57 @@ export class AgentPanel {
     );
     if (citation && this.item) {
       event.preventDefault();
+      if (this.locating) return;
       const item = this.item;
-      const sources =
-        this.current()?.messages.flatMap((m) => m.sources || []) || [];
-      void openCitation(item, citation.dataset.sourceId!, sources)
+      const conversation = this.current();
+      const message =
+        conversation?.messages[Number(citation.dataset.messageIndex)];
+      if (!message) return;
+      const id = citation.dataset.sourceId!;
+      const claim = citation.closest("p, li")?.textContent || message.content;
+      const cacheKey = `${id}:${evidenceKey(claim)}`;
+      const state = this.state;
+      this.locating = true;
+      this.status.textContent = "核对引用原句与图表位置…";
+      void (async () => {
+        const corpus = await getCorpus(item);
+        const source =
+          message.sources?.find((s) => s.id === id) ||
+          corpus.chunks.find((s) => s.id === id);
+        if (!source) throw Error("引用来源不可用");
+        const evidence =
+          message.locations?.[cacheKey] ||
+          (await resolveEvidence(
+            item,
+            corpus,
+            source,
+            claim,
+            message.model || conversation!.model,
+          ));
+        if (!evidence.anchor) throw Error("尚未核对具体引用");
+        message.locations ||= {};
+        message.locations[cacheKey] = evidence;
+        if (state) await saveChats(item, state);
+        if (
+          this.disposed ||
+          this.item?.id !== item.id ||
+          this.current()?.id !== conversation?.id
+        )
+          throw Error("已切换条目或对话，定位已取消");
+        return openCitation(item, evidence.id, [evidence]);
+      })()
         .then((result) => {
           if (!this.disposed && this.item?.id === item.id)
             this.status.textContent = result.located
               ? "已定位引用原文"
-              : `已跳到 PDF 第${result.pageIndex + 1}页`;
+              : `已打开 PDF 第${result.pageIndex + 1}页；未能可靠匹配坐标，未高亮`;
         })
         .catch((error) => {
-          if (!this.disposed)
+          if (!this.disposed && this.item?.id === item.id)
             this.status.textContent = (error as Error).message;
+        })
+        .finally(() => {
+          this.locating = false;
         });
       return;
     }

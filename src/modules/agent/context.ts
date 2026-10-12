@@ -2,6 +2,13 @@ export interface SourceChunk {
   id: string;
   source: string;
   text: string;
+  anchor?: {
+    kind: "text" | "figure";
+    quote: string;
+    region?: number[];
+    figureLabel?: string;
+    stamp?: string;
+  };
   attachmentKey?: string;
   pageIndex?: number;
 }
@@ -21,6 +28,7 @@ export interface Message {
   content: string;
   status?: "complete" | "stopped" | "error";
   sources?: SourceChunk[];
+  locations?: Record<string, SourceChunk>;
   selection?: string;
   model?: string;
   created: number;
