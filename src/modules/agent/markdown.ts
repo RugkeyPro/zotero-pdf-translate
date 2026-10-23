@@ -1,3 +1,4 @@
+import { cleanAnswer } from "./context";
 import { mathElement } from "./math";
 // Render a small Markdown subset using text nodes; never insert model HTML.
 export function renderMarkdown(
@@ -46,7 +47,7 @@ export function renderMarkdown(
     node.append(doc.createTextNode(source.slice(at)));
   };
   target.replaceChildren();
-  const lines = text.replace(/\r/g, "").split("\n");
+  const lines = cleanAnswer(text).replace(/\r/g, "").split("\n");
   let paragraph: string[] = [];
   const flush = () => {
     if (paragraph.length) {

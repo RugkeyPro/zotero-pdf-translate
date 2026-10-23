@@ -283,7 +283,7 @@ export class AgentPanel {
         details.append(label);
         for (const source of m.sources) {
           const p = this.el("p");
-          p.textContent = `[${source.id}] ${source.source}\n${source.text}`;
+          p.textContent = `${source.source}\n${source.text}`;
           details.append(p);
         }
         card.append(details);

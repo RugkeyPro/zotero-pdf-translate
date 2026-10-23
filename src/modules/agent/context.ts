@@ -104,6 +104,24 @@ export function coverage(chunks: SourceChunk[], limit = 12) {
     .sort((a, b) => Number(!a.id.endsWith("-1")) - Number(!b.id.endsWith("-1")))
     .slice(0, limit);
 }
+// Retrieval IDs stay internal; keep human references such as Fig. 2 and Table S1.
+export function cleanAnswer(text: string) {
+  const id = String.raw`(?:PDF[A-Z0-9]+-(?:[TF][A-F0-9]+|\d+)|NOTE[A-Z0-9]+-\d+|ANN[A-Z0-9]+-\d+|META-\d+)`;
+  return text
+    .replace(
+      new RegExp(
+        String.raw`[ \t]*\[\s*${id}(?:\s*[,，;；、–—]\s*${id})*\s*\]`,
+        "g",
+      ),
+      "",
+    )
+    .replace(new RegExp(String.raw`\b${id}\b`, "g"), "")
+    .replace(
+      /\[\s*(?:PDF[A-Z0-9]+|NOTE[A-Z0-9]+|ANN[A-Z0-9]+|META-)[A-Z0-9,;\s-]*$/,
+      "",
+    )
+    .trim();
+}
 export function formatSources(chunks: SourceChunk[]) {
   return chunks.map((c) => `[${c.id}] ${c.source}\n${c.text}`).join("\n\n");
 }
@@ -113,7 +131,9 @@ export function recentHistory(conversation: Conversation, budget = 16000) {
     .slice(conversation.summarized)
     .reverse()) {
     if (m.status === "error" || !m.content) continue;
-    const content = m.content.slice(0, 8000);
+    const content = (
+      m.role === "assistant" ? cleanAnswer(m.content) : m.content
+    ).slice(0, 8000);
     if (result.length && budget < content.length) break;
     result.unshift({ role: m.role, content });
     budget -= content.length;
