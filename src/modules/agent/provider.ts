@@ -79,9 +79,20 @@ export async function listModels() {
     responseType: "json",
     timeout: 25000,
   });
-  return (response.response.data as { id: string }[])
-    .map((m) => m.id)
-    .filter((id) => !/(image|tts|speech)/i.test(id));
+  const data = response.response?.data;
+  if (!Array.isArray(data)) throw new Error("CPA 模型列表格式无效");
+  const models = [
+    ...new Set(
+      data
+        .map((m: any) => m?.id)
+        .filter(
+          (id: unknown): id is string =>
+            typeof id === "string" && !!id && !/(image|tts|speech)/i.test(id),
+        ),
+    ),
+  ];
+  if (!models.length) throw new Error("CPA 未提供可用的文本模型");
+  return models;
 }
 export class SSEDecoder {
   private pending = "";
@@ -118,6 +129,7 @@ export async function streamChat(
     signal: AbortSignal;
     onText: (text: string) => void;
     tools?: any[];
+    final?: boolean;
   },
 ) {
   const p = await getProvider();
@@ -127,27 +139,29 @@ export async function streamChat(
   let content = "";
   const calls = new Map<number, any>();
   let parseError: unknown;
-  const consume = (text: string, final = false) => {
-    for (const event of decoder.push(text, final)) {
-      if (event.error) throw new Error("CPA 返回模型错误，请尝试其他模型");
-      const delta = event.choices?.[0]?.delta;
-      if (!delta) continue;
-      if (typeof delta.content === "string") {
-        content += delta.content;
-        options.onText(delta.content);
-      }
-      for (const t of delta.tool_calls || []) {
-        const c = calls.get(t.index) || {
-          id: "",
-          type: "function",
-          function: { name: "", arguments: "" },
-        };
-        if (t.id) c.id = t.id;
-        if (t.function?.name) c.function.name = t.function.name;
-        c.function.arguments += t.function?.arguments || "";
-        calls.set(t.index, c);
-      }
+  let receivedResponse = false;
+  const accept = (event: any) => {
+    if (event.error) throw new Error("CPA 返回模型错误，请尝试其他模型");
+    const delta = event.choices?.[0]?.delta;
+    if (!delta) return;
+    if (typeof delta.content === "string") {
+      content += delta.content;
+      options.onText(delta.content);
     }
+    for (const t of delta.tool_calls || []) {
+      const c = calls.get(t.index) || {
+        id: "",
+        type: "function",
+        function: { name: "", arguments: "" },
+      };
+      if (t.id) c.id = t.id;
+      if (t.function?.name) c.function.name = t.function.name;
+      c.function.arguments += t.function?.arguments || "";
+      calls.set(t.index, c);
+    }
+  };
+  const consume = (text: string, final = false) => {
+    for (const event of decoder.push(text, final)) accept(event);
   };
   let xhr: XMLHttpRequest | undefined;
   const abort = () => xhr?.abort();
@@ -166,6 +180,7 @@ export async function streamChat(
           messages,
           stream: true,
           ...(options.tools?.length ? { tools: options.tools } : {}),
+          ...(options.final ? { tool_choice: "none" } : {}),
         }),
         responseType: "text",
         timeout: 180000,
@@ -189,13 +204,24 @@ export async function streamChat(
         },
       },
     );
-    consume(response.responseText.slice(offset), true);
+    receivedResponse = true;
+    if (response.responseText.trimStart().startsWith("{")) {
+      const body = JSON.parse(response.responseText);
+      accept({
+        ...body,
+        choices: body.choices?.map((choice: any) => ({
+          delta: choice.message || choice.delta,
+        })),
+      });
+    } else consume(response.responseText.slice(offset), true);
     if (!content && !calls.size)
       throw new Error("模型没有返回正文，请切换模型重试");
     return { content, tool_calls: [...calls.values()] };
   } catch (error) {
     if (options.signal.aborted) throw new Error("已停止");
     if (parseError) throw parseError;
+    if (receivedResponse)
+      throw new Error((error as Error).message || "CPA 返回了无法识别的回答");
     const status = (error as any)?.status;
     throw new Error(
       status

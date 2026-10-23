@@ -4,22 +4,18 @@ export function renderMarkdown(
   doc: Document,
   target: HTMLElement,
   text: string,
-  citation?: (id: string) => HTMLElement,
 ) {
   const el = (tag: string) =>
     doc.createElementNS("http://www.w3.org/1999/xhtml", tag) as HTMLElement;
   const inline = (node: HTMLElement, source: string) => {
     const pattern =
-      /(`[^`\n]+`|\$\$[\s\S]+?\$\$|\\\[[\s\S]+?\\\]|\\\([\s\S]+?\\\)|(?<!\\)\$(?!\$)[^$\n]+?\$|\bPDF[A-Z0-9]+P\d+-(?:\d+|[TF][A-F0-9]+)\b|\*\*[^*\n]+\*\*|\*[^*\n]+\*|\[[^\]\n]+\]\(https?:\/\/[^\s)]+\))/g;
+      /(`[^`\n]+`|\$\$[\s\S]+?\$\$|\\\[[\s\S]+?\\\]|\\\([\s\S]+?\\\)|(?<!\\)\$(?!\$)[^$\n]+?\$|\*\*[^*\n]+\*\*|\*[^*\n]+\*|\[[^\]\n]+\]\(https?:\/\/[^\s)]+\))/g;
     let at = 0;
     for (const match of source.matchAll(pattern)) {
       node.append(doc.createTextNode(source.slice(at, match.index)));
       const token = match[0];
       let child: HTMLElement;
-      if (/^PDF[A-Z0-9]+P\d+-(?:\d+|[TF][A-F0-9]+)$/.test(token)) {
-        child = citation ? citation(token) : el("span");
-        if (!citation) child.textContent = token;
-      } else if (
+      if (
         token.startsWith("$") ||
         token.startsWith("\\[") ||
         token.startsWith("\\(")
